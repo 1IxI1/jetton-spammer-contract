@@ -4,6 +4,7 @@ import { Spammer } from '../wrappers/Spammer';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
+import { JettonWallet } from '../wrappers/JettonWallet';
 
 describe('Spammer', () => {
     let code: Cell;
@@ -16,6 +17,7 @@ describe('Spammer', () => {
     let spammer: SandboxContract<Spammer>;
     let deployer: SandboxContract<TreasuryContract>;
     let jwalletAddress: Address;
+    const mintAmount = 100_000n;
 
     beforeAll(async () => {
         const jminter_code = Cell.fromBoc(
@@ -48,13 +50,7 @@ describe('Spammer', () => {
             )
         );
 
-        const mintResult = await jminter.sendMint(
-            deployer.getSender(),
-            spammer.address,
-            toNano('100000'),
-            0n,
-            toNano('1')
-        );
+        const mintResult = await jminter.sendMint(deployer.getSender(), spammer.address, mintAmount, 0n, toNano('1'));
         expect(mintResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: jminter.address,
@@ -73,7 +69,6 @@ describe('Spammer', () => {
     });
 
     it('should deploy', async () => {});
-    it('should deploy', async () => {});
 
     it('should start spamming', async () => {
         const spamResult = await spammer.sendStart(deployer.getSender(), toNano('10'));
@@ -88,6 +83,21 @@ describe('Spammer', () => {
             to: jwalletAddress,
             success: true,
         });
-        console.log('Total sent', spamResult.transactions.length);
+
+        let transfers = 0;
+        expect(spamResult.transactions).not.toHaveTransaction({
+            // just to count transfers
+            from: jwalletAddress,
+            success: true,
+            op: 0x178d4519, // internal_transfer
+            value: () => {
+                transfers++;
+                return false;
+            },
+        });
+        console.log('Total transfers', transfers);
+        const jwallet = blockchain.openContract(JettonWallet.createFromAddress(jwalletAddress));
+        const jbalance = await jwallet.getJettonBalance();
+        expect(jbalance).toBe(mintAmount - BigInt(transfers));
     });
 });

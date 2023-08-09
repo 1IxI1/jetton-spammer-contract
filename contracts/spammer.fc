@@ -48,7 +48,7 @@ const int op::transfer = 0xf8a7ea5;
                 begin_cell()
                 .store_uint(op::transfer, 32)
                 .store_uint(query_id, 64)
-                .store_coins(0)
+                .store_coins(1) ;; send 1 nanoton
                 .store_uint(0x400, 11).store_uint(random(), 256) ;; random receiver address
                 .store_slice(my_address())
                 .store_int(false, 1)
