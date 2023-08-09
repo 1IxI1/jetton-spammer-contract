@@ -1,0 +1,60 @@
+#include "imports/stdlib.fc";
+
+const int SPAM_CONFIG = -137;
+const int op::init = 0x1;
+const int op::excesses = 0xd53276db;
+const int op::transfer = 0xf8a7ea5;
+
+() check_config() impure inline {
+    cell config = config_param(SPAM_CONFIG);
+    if (config.cell_null?()) {
+        return ();
+    }
+    throw_if(666, config.begin_parse().preload_uint(16) == 1);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    slice my_jwallet = get_data().begin_parse();
+
+    if (op == op::init) {
+        throw_unless(300, my_jwallet.preload_uint(2) == 0);
+        slice new_jwallet  = in_msg_body~load_msg_addr();
+        set_data(begin_cell().store_slice(new_jwallet).end_cell());
+        return ();
+    }
+    if (op != op::excesses) {
+        return ();
+    }
+
+    check_config();
+
+    int query_id = in_msg_body~load_uint(64);
+
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(my_jwallet)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(
+                begin_cell()
+                .store_uint(op::transfer, 32)
+                .store_uint(query_id, 64)
+                .store_coins(0)
+                .store_uint(0x400, 11).store_uint(random(), 256) ;; random receiver address
+                .store_slice(my_address())
+                .store_int(false, 1)
+                .store_coins(0)
+                .store_int(false, 1)
+                .end_cell()
+            );
+    send_raw_message(msg.end_cell(), 64);
+}
