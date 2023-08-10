@@ -13,7 +13,7 @@ const int op::transfer = 0xf8a7ea5;
     throw_if(666, config.begin_parse().preload_uint(16) == 1);
 }
 
-() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
     slice cs = in_msg_full.begin_parse();
     int flags = cs~load_uint(4);
 
